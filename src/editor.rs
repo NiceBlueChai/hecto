@@ -1,54 +1,72 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::terminal::ClearType;
+use crossterm::{execute, Result};
+use std::io::stdout;
 
 fn die(e: &std::io::Error) {
+    let mut stdout = stdout();
+    execute!(stdout, crossterm::terminal::Clear(ClearType::All)).unwrap();
     panic!("{}", e);
 }
+
 #[derive(Default)]
-pub struct Editor {}
+pub struct Editor {
+    should_quit: bool,
+}
 
 impl Editor {
-    pub fn run(&self) {
+    pub fn run(&mut self) {
         let _a = crossterm::terminal::enable_raw_mode();
         loop {
-            let key = crossterm::event::read();
-            match key {
-                Ok(ev) => {
-                    if let Event::Key(event) = ev {
-                        match event {
-                            KeyEvent {
-                                code: KeyCode::Char('q'),
-                                modifiers: KeyModifiers::CONTROL,
-                            } => {
-                                break;
-                            }
-                            // KeyEvent{code, modifiers} => println!("{:?}, {:?}", code, modifiers),
-                            KeyEvent { code, modifiers } => {
-                                if let KeyCode::Char(c) = code {
-                                    if c.is_control() {
-                                        println!("{:?}\r", c as u8);
-                                    } else {
-                                        println!("{:?} ({})\r", c as u8, c);
-                                    }
-                                } else {
-                                    println!("{:?}", KeyEvent::new(code, modifiers));
-                                }
-                            }
-                            // _ => println!("other ev");
-                            // let c = b as char;
-                            // if c.is_control() {
-                            //     println!("{:?} \r", b);
-                            //     // stdout().execute(MoveTo(0, 0)).unwrap();
-                            // } else {
-                            //     println!("{:?} ({})\r", b, c);
-                            // }
-                            // if b == to_ctrl_byte('q') {
-                            //     break;
-                            // }
-                        }
-                    }
-                }
-                Err(e) => die(&e),
+            if let Err(error) = self.refresh_screen() {
+                die(&error);
             }
+            if self.should_quit {
+                break;
+            }
+            if let Err(error) = self.process_keypress() {
+                die(&error);
+            }
+        }
+    }
+
+    fn refresh_screen(&self) -> Result<()> {
+        let mut stdout = stdout();
+        execute!(stdout, crossterm::terminal::Clear(ClearType::All))?;
+        execute!(stdout, crossterm::cursor::MoveTo(0,0))?;
+        if self.should_quit {
+            println!("Goodbye.\r");
+        } else {
+            self.draw_row();
+            execute!(stdout, crossterm::cursor::MoveTo(0,0))?;
+        }
+        Ok(())
+    }
+
+    fn draw_row(&self) {
+        for _ in 0..24 {
+            println!("~\r");
+        }
+        println!("{:?}", crossterm::terminal::size().unwrap());
+    }
+    fn process_keypress(&mut self) -> Result<()> {
+        let key_event = read_key()?;
+        if let KeyEvent {
+            code: KeyCode::Char('q'),
+            modifiers: KeyModifiers::CONTROL,
+        } = key_event
+        {
+            self.should_quit = true;
+        }
+
+        Ok(())
+    }
+}
+
+fn read_key() -> Result<KeyEvent> {
+    loop {
+        if let Event::Key(event) = crossterm::event::read()? {
+            return Ok(event);
         }
     }
 }

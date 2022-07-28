@@ -6,6 +6,5 @@ mod editor;
 
 fn main() {
     println!("Hello, world!");
-    let editor = Editor::default();
-    editor.run();
+    Editor::default().run();
 }
