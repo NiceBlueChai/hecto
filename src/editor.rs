@@ -1,4 +1,6 @@
+use crate::Document;
 use crate::Terminal;
+use crate::Row;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::Result;
 
@@ -9,11 +11,22 @@ fn die(e: &std::io::Error) {
     panic!("{}", e);
 }
 
-#[derive(Default)]
 pub struct Editor {
     should_quit: bool,
     terminal: Terminal,
     cursor_position: Position,
+    document: Document,
+}
+
+impl Default for Editor {
+    fn default() -> Self {
+        Self {
+            should_quit: Default::default(),
+            terminal: Default::default(),
+            cursor_position: Default::default(),
+            document: Document::open(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -25,7 +38,6 @@ pub struct Position {
 impl Editor {
     pub fn run(&mut self) {
         loop {
-
             if let Err(error) = self.refresh_screen() {
                 die(&error);
             }
@@ -41,12 +53,12 @@ impl Editor {
     fn refresh_screen(&self) -> Result<()> {
         Terminal::cursor_hide();
         //NOTE: 防止第一行从光标处打印，先将光标移动到左上角
-        Terminal::cursor_position(&Position { x: 0, y: 0 });
+        Terminal::cursor_position(&Position::default());
         if self.should_quit {
             Terminal::clear_screen();
             println!("Goodbye.\r");
         } else {
-            self.draw_row();
+            self.draw_rows();
             Terminal::cursor_position(&self.cursor_position)
         }
         Terminal::cursor_show();
@@ -54,11 +66,20 @@ impl Editor {
         Ok(())
     }
 
-    fn draw_row(&self) {
+    fn draw_row(&self, row: &Row) {
+        let start = 0;
+        let end = self.terminal.size().width as usize;
+        let row = row.render(start, end);
+        println!("{}\r", row);
+    }
+
+    fn draw_rows(&self) {
         let height = self.terminal.size().height as usize;
-        for row in 0..height - 1 {
+        for terminal_row in 0..height - 1 {
             Terminal::clear_current_line();
-            if row == height / 3 {
+            if let Some(row) = self.document.row(terminal_row) {
+                self.draw_row(row);
+            } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
             } else {
                 println!("~\r");
