@@ -24,7 +24,6 @@ pub struct Position {
 
 impl Editor {
     pub fn run(&mut self) {
-        let _a = crossterm::terminal::enable_raw_mode();
         loop {
 
             if let Err(error) = self.refresh_screen() {
@@ -41,13 +40,14 @@ impl Editor {
 
     fn refresh_screen(&self) -> Result<()> {
         Terminal::cursor_hide();
-        Terminal::move_to(&self.cursor_position);
+        //NOTE: 防止第一行从光标处打印，先将光标移动到左上角
+        Terminal::cursor_position(&Position { x: 0, y: 0 });
         if self.should_quit {
             Terminal::clear_screen();
             println!("Goodbye.\r");
         } else {
             self.draw_row();
-            Terminal::move_to(&self.cursor_position)
+            Terminal::cursor_position(&self.cursor_position)
         }
         Terminal::cursor_show();
         Terminal::flush();

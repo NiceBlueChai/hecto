@@ -26,6 +26,12 @@ impl Default for Terminal {
     }
 }
 
+impl std::ops::Drop for Terminal {
+    fn drop(&mut self) {
+        crossterm::terminal::disable_raw_mode().expect("Failed disable raw mode");
+    }
+}
+
 impl Terminal {
     pub fn size(&self) -> &Size {
         &self.size
@@ -46,7 +52,7 @@ impl Terminal {
         execute!(stdout(), Clear(ClearType::CurrentLine)).unwrap();
     }
 
-    pub fn move_to(pos: &Position) {
+    pub fn cursor_position(pos: &Position) {
         let Position { x, y } = pos;
         let x = *x as u16;
         let y = *y as u16;
