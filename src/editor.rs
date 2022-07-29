@@ -1,8 +1,9 @@
 use crate::Document;
-use crate::Terminal;
 use crate::Row;
+use crate::Terminal;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::Result;
+use std::env;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -15,16 +16,26 @@ pub struct Editor {
     should_quit: bool,
     terminal: Terminal,
     cursor_position: Position,
+    offset: Position,
     document: Document,
 }
 
 impl Default for Editor {
     fn default() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let document = if args.len() > 1 {
+            let fnm = &args[1];
+            Document::open(&fnm).unwrap_or_default()
+        } else {
+            Document::default()
+        };
+
         Self {
             should_quit: Default::default(),
             terminal: Default::default(),
             cursor_position: Default::default(),
-            document: Document::open(),
+            offset: Default::default(),
+            document,
         }
     }
 }
@@ -77,7 +88,7 @@ impl Editor {
         let height = self.terminal.size().height as usize;
         for terminal_row in 0..height - 1 {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(terminal_row) {
+            if let Some(row) = self.document.row(terminal_row + self.offset.y) {
                 self.draw_row(row);
             } else if self.document.is_empty() && terminal_row == height / 3 {
                 self.draw_welcome_message();
@@ -99,20 +110,29 @@ impl Editor {
     }
     fn move_cursor(&mut self, kev: KeyEvent) {
         let Position { mut x, mut y } = self.cursor_position;
+        let Position { x: ox, y: mut oy } = self.offset;
         let size = self.terminal.size();
         let height = size.height as usize;
         let width = size.width as usize;
         match kev.code {
-            KeyCode::Up => y = y.saturating_sub(1),
+            KeyCode::Up => {
+                if y > 0 {
+                    y = y.saturating_sub(1);
+                } else {
+                    oy = oy.saturating_sub(1);
+                }
+            }
             KeyCode::Down => {
                 if y < height {
                     y = y.saturating_add(1);
+                } else {
+                    oy = oy.saturating_add(1);
                 }
             }
             KeyCode::Left => x = x.saturating_sub(1),
             KeyCode::Right => {
                 if x < width {
-                    x = x.saturating_add(1)
+                    x = x.saturating_add(1);
                 }
             }
             KeyCode::Home => x = 0,
@@ -122,6 +142,7 @@ impl Editor {
             _ => (),
         }
         self.cursor_position = Position { x, y };
+        self.offset = Position { x: ox, y: oy };
     }
 
     fn process_keypress(&mut self) -> Result<()> {
