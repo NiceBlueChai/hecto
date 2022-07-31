@@ -14,9 +14,7 @@ impl Document {
         for value in contents.lines() {
             rows.push(Row::from(value));
         }
-        Ok(Self{
-            rows,
-        })
+        Ok(Self { rows })
     }
     pub fn row(&self, index: usize) -> Option<&Row> {
         self.rows.get(index)
@@ -24,5 +22,9 @@ impl Document {
 
     pub fn is_empty(&self) -> bool {
         self.rows.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.rows.len()
     }
 }

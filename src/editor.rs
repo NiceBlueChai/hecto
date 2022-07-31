@@ -40,10 +40,20 @@ impl Default for Editor {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
+}
+
+impl std::ops::Sub for Position {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self::Output {
+        Position {
+            x: self.x.saturating_sub(other.x),
+            y: self.y.saturating_sub(other.y),
+        }
+    }
 }
 
 impl Editor {
@@ -70,7 +80,7 @@ impl Editor {
             println!("Goodbye.\r");
         } else {
             self.draw_rows();
-            Terminal::cursor_position(&self.cursor_position)
+            Terminal::cursor_position(&(self.cursor_position - self.offset));
         }
         Terminal::cursor_show();
         Terminal::flush();
@@ -78,8 +88,9 @@ impl Editor {
     }
 
     fn draw_row(&self, row: &Row) {
-        let start = 0;
-        let end = self.terminal.size().width as usize;
+        let start = self.offset.x;
+        let width = self.terminal.size().width as usize;
+        let end = start + width;
         let row = row.render(start, end);
         println!("{}\r", row);
     }
@@ -110,23 +121,22 @@ impl Editor {
     }
     fn move_cursor(&mut self, kev: KeyEvent) {
         let Position { mut x, mut y } = self.cursor_position;
-        let Position { x: ox, y: mut oy } = self.offset;
-        let size = self.terminal.size();
-        let height = size.height as usize;
-        let width = size.width as usize;
+        let height = self.document.len();
+        let terminal_height = self.terminal.size().height as usize;
+        let width = if let Some(row) = self.document.row(y) {
+            row.len()
+        } else {
+            0
+        };
         match kev.code {
             KeyCode::Up => {
                 if y > 0 {
                     y = y.saturating_sub(1);
-                } else {
-                    oy = oy.saturating_sub(1);
                 }
             }
             KeyCode::Down => {
                 if y < height {
                     y = y.saturating_add(1);
-                } else {
-                    oy = oy.saturating_add(1);
                 }
             }
             KeyCode::Left => x = x.saturating_sub(1),
@@ -137,12 +147,23 @@ impl Editor {
             }
             KeyCode::Home => x = 0,
             KeyCode::End => x = width,
-            KeyCode::PageUp => y = 0,
-            KeyCode::PageDown => y = height,
+            KeyCode::PageUp => {
+                y = if y > terminal_height {
+                    y - terminal_height
+                } else {
+                    0
+                }
+            }
+            KeyCode::PageDown => {
+                y = if y.saturating_add(terminal_height) < height {
+                    y + terminal_height
+                } else {
+                    height
+                }
+            }
             _ => (),
         }
         self.cursor_position = Position { x, y };
-        self.offset = Position { x: ox, y: oy };
     }
 
     fn process_keypress(&mut self) -> Result<()> {
@@ -165,7 +186,24 @@ impl Editor {
                 _ => (),
             },
         }
-
+        self.scroll();
         Ok(())
+    }
+    fn scroll(&mut self) {
+        let Position { x, y } = self.cursor_position;
+        let width = self.terminal.size().width as usize;
+        let height = self.terminal.size().height as usize;
+        let mut offset = &mut self.offset;
+        if y < offset.y {
+            offset.y = y;
+        } else if y >= offset.y.saturating_add(height) {
+            offset.y = y.saturating_sub(height).saturating_add(1);
+        }
+
+        if x < offset.x {
+            offset.x = x;
+        } else if x >= offset.x.saturating_add(width) {
+            offset.x = x.saturating_add(width).saturating_add(1);
+        }
     }
 }
