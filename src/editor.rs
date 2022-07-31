@@ -153,7 +153,10 @@ impl Editor {
             },
             KeyCode::Right => {
                 if x < width {
-                    x = x.saturating_add(1);
+                    x += 1;
+                } else if y < height {
+                    x = 0;
+                    y += 1;
                 }
             }
             KeyCode::Home => x = 0,
