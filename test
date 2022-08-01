@@ -1,0 +1,11 @@
+impl Deref for Row {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.string.deref()
+    }
+}
+a   a  a
+    \täää
+y̆y̆y̆
+❤❤❤
+你好啊肖再忠
